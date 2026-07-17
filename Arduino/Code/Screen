@@ -1,0 +1,158 @@
+from machine import Pin, SoftI2C
+import time
+import sh1106 as dis
+
+#Light led D5
+# D4 Red
+# D3 Green
+
+ledLight = Pin("D5",Pin.OUT)
+ledRed = Pin("D4",Pin.OUT)
+ledGreen = Pin("D3",Pin.OUT)
+
+ledArray = [ledLight,ledRed,ledGreen]
+ledLight.value(0)
+ledRed.value(0)
+ledGreen.value(0)
+
+
+
+
+def menu():
+  active = False
+  
+  print()
+  print("-----------")
+  print("Menu")
+  print("-----------")
+  print("1 | All On")
+  print("2 | All Off")
+  print("3 | Screen")
+  select = int(input())
+
+  if select == 1:
+    allOn(ledArray)
+  elif select == 2:
+    allOff(ledArray)
+  elif select == 3:
+    screen(i2cBus)
+
+def allOff(ledArray):
+  for x in range(len(ledArray)):
+    ledArray[x].value(0)
+  menu()
+
+def allOn(ledArray):
+  for x in range(len(ledArray)):
+    ledArray[x].value(1)
+  menu()
+
+def screen(i2cBus):
+  # Uses https://github.com/robert-hh/SH1106/tree/master
+  
+  # Screen stuff
+  # SCL A7, SDA A6, Freq 400kHz
+  i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+  print("Scanning for I2C devices")
+  devices = i2c.scan()
+  
+  print()
+  print("List Of Devices:")
+  print(devices)
+  
+  width = 128
+  height = 64
+
+  oled = dis.SH1106_I2C(width,height,i2c,rotate=180)
+
+  def disMenu():
+    print()
+    print("-----------")
+    print("Menu")
+    print("-----------")
+    print("1 | HText")
+    print("2 | textDisplay")
+    print("3 | Timer")
+    print("0 | Exit")
+    print("1738 | Clear Screen")
+    select = int(input())
+  
+    if select == 1:
+      Htext()
+    elif select == 2:
+      textDisplay()
+    elif select == 3:
+      timer()
+    elif select == 0:
+      menu()
+    elif select == 1738:
+      oled.fill(0)
+      oled.show()
+      print("Display Cleared!")
+      disMenu()
+      
+  def Htext():
+    oled.text("I", 0, 0)
+    oled.text("Love", 0, 20)
+    oled.text("You <3", 0, 40)
+    oled.show()
+    disMenu()
+
+  def textDisplay():
+    #clearing
+    oled.fill(0)
+    
+    print("Input how many lines you want:")
+    lines = int(input())
+    lineHeight = height/lines
+    textArray = [""]*lines
+
+    for x in range(lines):
+      print("Input what you want to display on line",str((x+1)))
+      textArray[x] = input()
+      print(textArray)
+
+    print("Collection done!")
+    time.sleep(0.5)
+    print("Displaying!")
+
+    heightCount = 0
+    for x in range(len(textArray)):
+      oled.text(textArray[x],0,int(heightCount))
+      heightCount = int(heightCount+lineHeight)
+      oled.show()
+    
+    print("Displaying Finished!")
+    disMenu() 
+
+  def timer():
+    
+    print("----TIMER----")
+    print("Set timer duration:")
+    dur = float(input())
+    currentDur = 0
+    while currentDur < dur:
+      oled.fill(0)
+      oled.show()
+      currentDur = round((currentDur + 0.1),2)
+      oled.text((str(currentDur)+" of "+str(dur)),0,0)
+      oled.show()
+      time.sleep(0.1)
+    
+    print("Timer Finished!")
+    oled.text("Time Reached!",0,20)
+    oled.show()
+    time.sleep(0.5)
+    
+      
+    disMenu()
+      
+    
+  #Main Menu Display for module  
+  disMenu()
+
+
+#MAIN whole program menu display
+menu()
+
+    
