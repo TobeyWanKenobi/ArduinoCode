@@ -1,3 +1,7 @@
+#Arduino Placement: Charging port R = C30
+#Screen Placement: GND port = J4
+
+
 from machine import Pin, SoftI2C
 import time
 import sh1106 as dis
