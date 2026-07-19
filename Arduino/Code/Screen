@@ -5,19 +5,47 @@
 from machine import Pin, SoftI2C
 import time
 import sh1106 as dis
+import qmc5883p
 
-#Light led D5
-# D4 Red
-# D3 Green
+# D3 Yellow
+# D2 Red
+# D4 Green
 
-ledLight = Pin("D5",Pin.OUT)
-ledRed = Pin("D4",Pin.OUT)
-ledGreen = Pin("D3",Pin.OUT)
+ledYel = Pin("D3",Pin.OUT)
+ledRed = Pin("D2",Pin.OUT)
+ledGreen = Pin("D4",Pin.OUT)
 
-ledArray = [ledLight,ledRed,ledGreen]
-ledLight.value(0)
+ledArray = [ledYel,ledRed,ledGreen]
+ledYel.value(0)
 ledRed.value(0)
 ledGreen.value(0)
+
+
+# Uses https://github.com/robert-hh/SH1106/tree/master
+  
+# Screen stuff
+# SCL A7, SDA A6, Freq 400kHz
+i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+print("Scanning for I2C devices")
+devices = i2c.scan()
+
+print()
+print("List Of Devices:")
+print(devices)
+
+width = 128
+height = 64
+
+oled = dis.SH1106_I2C(width,height,i2c,rotate=180)
+
+
+#Compuss stuff
+mag = qmc5883p.QMC5883P(i2c)
+
+# Black for GND
+# Red for V+
+# Blue for SDA
+# Yellow for SCL
 
 
 
@@ -25,49 +53,78 @@ ledGreen.value(0)
 def menu():
   active = False
   
+  #clearing
+  oled.fill(0)
+  textHeightOffset = 8
+  oled.text("Central Function Menu (CFM)", int(0), int((height/3)-textHeightOffset))
+  oled.text("Menu (CFM)", int(0), int((height/3)+9-textHeightOffset))
+  oled.text("By Tobey Wong", int(0), int((height-10)-textHeightOffset))
+  oled.show()
+  
   print()
   print("-----------")
   print("Menu")
   print("-----------")
-  print("1 | All On")
-  print("2 | All Off")
-  print("3 | Screen")
+  print("1 | LightControl")
+  print("2 | Screen")
+  print("3 | Compass")
   select = int(input())
 
   if select == 1:
-    allOn(ledArray)
+    light()
   elif select == 2:
-    allOff(ledArray)
+    screen()
   elif select == 3:
-    screen(i2cBus)
+    compass()
+  else:
+    print("Invalid Input")
+    menu()
+    
 
-def allOff(ledArray):
-  for x in range(len(ledArray)):
-    ledArray[x].value(0)
-  menu()
-
-def allOn(ledArray):
-  for x in range(len(ledArray)):
-    ledArray[x].value(1)
-  menu()
-
-def screen(i2cBus):
-  # Uses https://github.com/robert-hh/SH1106/tree/master
+def light():
+  #clearing
+  oled.fill(0)
   
-  # Screen stuff
-  # SCL A7, SDA A6, Freq 400kHz
-  i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
-  print("Scanning for I2C devices")
-  devices = i2c.scan()
+  def lightMenu():
+    print()
+    print("-----------")
+    print("Menu")
+    print("-----------")
+    print("1 | All on")
+    print("2 | All off")
+    print("3 | ")
+    print("0 | Exit")
+    print("1738 | Clear Screen")
+    select = int(input())
   
-  print()
-  print("List Of Devices:")
-  print(devices)
-  
-  width = 128
-  height = 64
+    if select == 1:
+      allOn(ledArray)
+    elif select == 2:
+      allOff(ledArray)
+    # elif select == 3:
+    #   timer()
+    elif select == 0:
+      menu()
 
-  oled = dis.SH1106_I2C(width,height,i2c,rotate=180)
+  def allOff(ledArray):
+    for x in range(len(ledArray)):
+      ledArray[x].value(0)
+    lightMenu()
+  
+  def allOn(ledArray):
+    for x in range(len(ledArray)):
+      ledArray[x].value(1)
+    lightMenu()
+
+  # Main Menu Display for module  
+  lightMenu()
+
+
+
+
+def screen():
+  #clearing
+  oled.fill(0)
 
   def disMenu():
     print()
@@ -96,6 +153,9 @@ def screen(i2cBus):
       disMenu()
       
   def Htext():
+    #clearing
+    oled.fill(0)
+    
     oled.text("I", 0, 0)
     oled.text("Love", 0, 20)
     oled.text("You <3", 0, 40)
@@ -130,6 +190,8 @@ def screen(i2cBus):
     disMenu() 
 
   def timer():
+    #clearing
+    oled.fill(0)
     
     print("----TIMER----")
     print("Set timer duration:")
@@ -150,11 +212,103 @@ def screen(i2cBus):
     
       
     disMenu()
-      
+    
     
   #Main Menu Display for module  
   disMenu()
 
+def compass():
+  oversampling = 0
+  sampleRate = 3
+  range = 0
+  
+  mag.set_oversampling(oversampling)
+  mag.set_samplingrate(sampleRate)
+  mag.set_range(range)
+  
+  # Black for GND
+  # Red for V+
+  # Blue for SDA
+  # Yellow for SCL
+  
+  
+  
+  
+  #CALIBRATION
+  x_min = y_min = z_min = 32767
+  x_max = y_max = z_max = -32768
+  
+  print("START ROTATING SENSOR IN ALL DIRECTIONS NOW...")
+  time.sleep(2)
+  
+  for _ in range(300):
+      # 1. Grab whatever data packet the library spits out
+      data_packet = mag.read_raw()
+      
+      # 2. Check length and dynamically extract X, Y, and Z
+      if len(data_packet) == 4:
+          x, y, z, t = data_packet # Handles standard (x, y, z, t) tuple
+      elif len(data_packet) == 3:
+          x, y, z = data_packet    # Gracefully catches (x, y, z) base fallback
+      else:
+          continue                 # Skip loop if it returns a corrupted packet
+      
+      # 3. Process calibration track points normally
+      x_min, x_max = min(x_min, x), max(x_max, x)
+      y_min, y_max = min(y_min, y), max(y_max, y)
+      z_min, z_max = min(z_min, z), max(z_max, z)
+      
+      time.sleep(0.01)
+  
+  # Calculate Offsets (Hard Iron)
+  xOff = (x_max + x_min) / 2
+  yOff = (y_max + y_min) / 2
+  zOff = (z_max + z_min) / 2
+  
+  # Calculate Scales (Soft Iron)
+  avg_delta = ((x_max - x_min) + (y_max - y_min) + (z_max - z_min)) / 3
+  xScl = avg_delta / (x_max - x_min)
+  yScl = avg_delta / (y_max - y_min)
+  zScl = avg_delta / (z_max - z_min)
+  
+  roundPos = 2
+  while True:
+    # time.sleep(0.2)
+    oled.fill(0)
+    x, y, z, t = mag.read_scaled()
+    x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
+  
+    #raw collection
+    data_packet = mag.read_raw()
+  
+    if len(data_packet) == 4:
+        rx, ry, rz, rt = data_packet # Handles standard (x, y, z, t) tuple
+    elif len(data_packet) == 3:
+        rx, ry, rz = data_packet    # Gracefully catches (x, y, z) base fallback
+    else:
+        continue                 # Skip loop if it returns a corrupted packet
+  
+    #Applying calibration
+    cx = (rx-xOff)*xScl
+    cy = (ry-yOff)*yScl
+  
+    
+    #Bearing
+    bearing = round(((m.atan2((cy*-1),cx))*(180/(m.pi))),0)
+    if bearing < 0:
+      bearing += 360
+  
+    #Display
+    # oled.text("X "+str(x),0,0)
+    # oled.text("Y "+str(y),0,10)
+    # oled.text("Z "+str(z),0,20)
+    oled.text(str(bearing)+" deg",0,30)
+    oled.show()
+    # print("x: {0} | y: {1} | z: {2} | temp: {3}".format(x, y, z, t))
+    print("x: ",x)
+    print("y: ",y)
+    print("z: ",z)
+    print(str(bearing)+"°")
 
 #MAIN whole program menu display
 menu()
