@@ -6,6 +6,7 @@ from machine import Pin, SoftI2C
 import time
 import sh1106 as dis
 import qmc5883p
+import math as m
 
 # D3 Yellow
 # D2 Red
@@ -47,12 +48,41 @@ mag = qmc5883p.QMC5883P(i2c)
 # Blue for SDA
 # Yellow for SCL
 
+  # N = D5
+  # NE = D6
+  # E = D7
+  # SE = D8
+  # S = D9
+  # SW = D10
+  # W = D11
+  # NW = D12
 
 
+
+ledN = Pin("D5",Pin.OUT)
+ledNE = Pin("D6",Pin.OUT)
+ledE = Pin("D7",Pin.OUT)
+ledSE = Pin("D8",Pin.OUT)
+ledS = Pin("D9",Pin.OUT)
+ledSW = Pin("D10",Pin.OUT)
+ledW = Pin("D11",Pin.OUT)
+ledNW = Pin("D12",Pin.OUT)
+
+compassLedArray = [ledN,ledNE,ledE,ledSE,ledS,ledSW,ledW,ledNW]
+
+def ledMenu():
+  for x in range(len(ledArray)):
+    ledArray[x].value(0)
+  ledYel.value(1)
+
+def ledFunc():
+  for x in range(len(ledArray)):
+    ledArray[x].value(0)
+  ledGreen.value(1)
 
 def menu():
   active = False
-  
+  ledMenu()
   #clearing
   oled.fill(0)
   textHeightOffset = 8
@@ -84,7 +114,7 @@ def menu():
 def light():
   #clearing
   oled.fill(0)
-  
+  ledFunc()
   def lightMenu():
     print()
     print("-----------")
@@ -109,11 +139,15 @@ def light():
   def allOff(ledArray):
     for x in range(len(ledArray)):
       ledArray[x].value(0)
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(0)
     lightMenu()
   
   def allOn(ledArray):
     for x in range(len(ledArray)):
       ledArray[x].value(1)
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(1)
     lightMenu()
 
   # Main Menu Display for module  
@@ -125,7 +159,8 @@ def light():
 def screen():
   #clearing
   oled.fill(0)
-
+  ledFunc()
+  
   def disMenu():
     print()
     print("-----------")
@@ -192,6 +227,7 @@ def screen():
   def timer():
     #clearing
     oled.fill(0)
+    ledFunc()
     
     print("----TIMER----")
     print("Set timer duration:")
@@ -218,6 +254,10 @@ def screen():
   disMenu()
 
 def compass():
+  #clearing
+  oled.fill(0)
+  ledFunc()
+  
   oversampling = 0
   sampleRate = 3
   range = 0
@@ -231,7 +271,14 @@ def compass():
   # Blue for SDA
   # Yellow for SCL
   
-  
+  # N = D5
+  # NE = D6
+  # E = D7
+  # SE = D8
+  # S = D9
+  # SW = D10
+  # W = D11
+  # NW = D12
   
   
   #CALIBRATION
@@ -274,6 +321,11 @@ def compass():
   roundPos = 2
   while True:
     # time.sleep(0.2)
+    
+    # Clear all lights
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(0)
+    
     oled.fill(0)
     x, y, z, t = mag.read_scaled()
     x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
@@ -297,7 +349,38 @@ def compass():
     bearing = round(((m.atan2((cy*-1),cx))*(180/(m.pi))),0)
     if bearing < 0:
       bearing += 360
-  
+
+    #Lights
+    # N = D5
+    # NE = D6
+    # E = D7
+    # SE = D8
+    # S = D9
+    # SW = D10
+    # W = D11
+    # NW = D12
+
+    if 330 <= bearing <= 360 or 000 <= bearing <= 30:
+      ledN.value(1)
+    elif 15 <= bearing <= 75:
+      ledNE.value(1)
+    elif 60 <= bearing <= 120:
+      ledE.value(1)
+    elif 105 <= bearing <= 165:
+      ledSE.value(1)
+    elif 150 <= bearing <= 210:
+      ledS.value(1)
+    elif 195 <= bearing <= 255:
+      ledSW.value(1)
+    elif 240 <= bearing <= 300:
+      ledW.value(1)
+    elif 285 <= bearing <= 345:
+      ledNW.value(1)
+    else:
+      for x in range(len(compassLedArray)):
+        compassLedArray[x].value(0)
+    
+    
     #Display
     # oled.text("X "+str(x),0,0)
     # oled.text("Y "+str(y),0,10)
@@ -310,6 +393,7 @@ def compass():
     print("z: ",z)
     print(str(bearing)+"°")
 
+ledRed.value(1)
 #MAIN whole program menu display
 menu()
 
