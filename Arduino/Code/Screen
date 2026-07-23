@@ -286,6 +286,14 @@ def compass():
   x_max = y_max = z_max = -32768
   
   print("START ROTATING SENSOR IN ALL DIRECTIONS NOW...")
+
+  oled.fill(0)
+  oled.text("Calibrating...",0, 10)
+  oled.text("Rotate in",0, 30)
+  oled.text("all directions",0, 39)
+
+  oled.show()
+  
   time.sleep(2)
   
   for _ in range(300):
@@ -305,7 +313,7 @@ def compass():
       y_min, y_max = min(y_min, y), max(y_max, y)
       z_min, z_max = min(z_min, z), max(z_max, z)
       
-      time.sleep(0.01)
+      time.sleep(0.03)
   
   # Calculate Offsets (Hard Iron)
   xOff = (x_max + x_min) / 2
@@ -396,5 +404,5 @@ def compass():
 ledRed.value(1)
 #MAIN whole program menu display
 menu()
-
+# compass()
     
