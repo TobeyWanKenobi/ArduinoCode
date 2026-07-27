@@ -1,0 +1,85 @@
+from machine import Pin, SoftI2C
+import time 
+import ubinascii as asc
+import network as net
+import esp32 as esp
+
+# MAC = Unique Identifier for device
+# Channel = Frequency packet was caught on
+# SSID = Simply WiFi or network Name
+# RSSI = Signal strength (Closer to 0 the better)
+
+# Sets ESP32 as a station recieving signals and activates it.
+wlan = net.WLAN(net.STA_IF)
+wlan.active(True)
+
+# Function for Scanning & Processing any signal recieved
+def process_wifi_packet(interface):
+  try:
+    scan_result = wlan.scan()
+    signalList = []
+
+    # Insertion sort algorithm based on RSSI/Signal Strength
+    for i in range(len(signalList)):
+      for x in range(0, len(signalList)-i-1):
+        if signalList[x][3] < signalList[x+1][3]:
+          temp = signalList[j]
+          signalList[j] = signalListp[j+1]
+          signalList[j+1] = temp
+
+    # Organises metadata into variables for each signal recieved (network_info) in the scan
+    for network_info in scan_result:
+      inList = False
+
+      #Sorting through and assigning varibles from signal
+      ssid = network_info[0].decode("utf-8").strip()
+      if not ssid: #If no SSID then default line below.
+        ssid = "<hidden network>"
+        
+      rawMac = network_info[1]
+      channel = network_info[2]
+      rssi = network_info[3]
+    
+      # takes raw Mac data, translates raw byte format to hex with : in between. decoded into utf-8 to turn numbers into text 
+      rawMacHex = asc.hexlify(rawMac).decode("utf-8")
+      mac = ":".join(rawMacHex[i:i+2] for i in range(0, len(rawMacHex), 2))
+
+      # Creating device variable for signal list
+      device = [mac,channel,ssid,rssi]
+
+      # Checking if device already in list
+      for y in range(len(signalList)):
+          if signalList[y][0] != device[0] and signalList[y][3] != device[3]:
+            inList = False
+          else:
+            inList = True
+            
+      # If Device not in list then add it to signalList array
+      if inList == False:
+        signalList.append(device)
+
+      #Printing device found (not exclusive. Includes all)
+      print("[Device Found] MAC: {0} | Channel: {1} | SSID: {2} | SignalStrength: {3}".format(mac,channel,ssid,rssi))
+      print("------------")
+     
+      #Printing list
+      for x in range(len(signalList)):
+        print(signalList[x])
+      print("------------------------")
+      print("")
+
+  # If there is an Error in the scan: Prints error then skips to next scan.
+  except Exception as e:
+    print("error in scan")
+    print(e)
+    pass
+
+print("Scanning started")
+
+# Keeping the code active with buffer to not overload ESP32.
+try:
+  while True:
+    process_wifi_packet(wlan)
+    time.sleep(0.5) # Buffer
+except KeyboardInterrupt:
+  print("stopped")
