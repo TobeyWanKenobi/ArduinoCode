@@ -1,0 +1,214 @@
+# Pre
+
+from machine import Pin, SoftI2C
+import time
+import sh1106 as dis
+import qmc5883p
+import math as m
+from lsm6ds3 import LSM6DS3, NORMAL_MODE_104HZ
+
+
+
+# SCL A7, SDA A6, Freq 400kHz
+
+#StemmaQT key
+  # Black for GND
+  # Red for V+
+  # Blue for SDA
+  # Yellow for SCL
+  
+# i2c config
+i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+
+print("Scanning for I2C devices")
+devices = i2c.scan()
+print()
+print("List Of Devices:")
+print(devices)
+
+
+#Compass config https://github.com/robert-hh/QMC5883
+mag = qmc5883p.QMC5883P(i2c)
+
+#GyroAccl config https://github.com/pimoroni/lsm6ds3-micropython
+gyroaccl = LSM6DS3(i2c, address=106, mode=NORMAL_MODE_104HZ)
+
+#Screen config
+width = 128
+height = 64
+
+oled = dis.SH1106_I2C(width,height,i2c,rotate=90)
+oled.init_display()
+
+
+
+#clearing
+oled.fill(0)
+oled.text("Screen", int(0), int((width/2))-5)
+oled.text("Test", int(0), int((width/2))+4)
+oled.show()
+
+
+def getGyroacclReading():
+  ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
+  return ax, ay, az, gx, gy, gz
+
+
+def gyroCali():
+  settlingTime = 2
+  calibrationTime = 10
+  offset = [0,0,0]
+  numPoints = 0
+  
+  time.sleep(settlingTime)
+  
+  # Adds calibration time to current real time
+  endloopTime = time.time() + calibrationTime
+  
+  # Starts calibration loop while the endloopTime(realtime with calibration added on) is more than current realtime
+  while endloopTime > time.time():
+    numPoints += 1
+    (ax, ay, az, gx, gy, gz) = getGyroacclReading()
+    offset[0] += gx
+    offset[1] += gy
+    offset[2] += gz
+  
+    # For every multiple of 100 of points done it displays progress.
+    if numPoints % 100 == 0:
+      print("Calibrating | {0} points done".format(numPoints))
+  
+  print("Calibration complete. {0} Points".format(numPoints))
+
+  # Averages each offset using num of points done.
+  offset = [i/numPoints for i in offset]
+  # print("OFFSET: {0}".format(offset))
+  return offset
+
+def gyroacclDis(offset):
+  while True:
+    ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
+    gyro = [gx,gy,gz]
+    accl = [ax,ay,az]
+
+    # Adds or subtracts offset according to num sign (+ or -)
+    for x in range(len(gyro)):  
+      gyro[x] = gyro[x]-offset[x] 
+        
+    
+
+    print("Accelerometer\nX:{}, Y:{}, Z:{}\nGyro\nX:{}, Y:{}, Z{}\n\n ".format(ax, ay, az, gyro[0], gyro[1], gyro[2]))
+    time.sleep(0.2)
+
+offset = gyroCali()
+gyroacclDis(offset)
+    
+
+def compass():
+  #clearing
+  oled.fill(0)
+  
+  oversampling = 0
+  sampleRate = 3
+  range = 0
+  
+  mag.set_oversampling(oversampling)
+  mag.set_samplingrate(sampleRate)
+  mag.set_range(range)
+  
+  
+  # N = D5
+  # NE = D6
+  # E = D7
+  # SE = D8
+  # S = D9
+  # SW = D10
+  # W = D11
+  # NW = D12
+  
+  
+  #CALIBRATION
+  x_min = y_min = z_min = 32767
+  x_max = y_max = z_max = -32768
+  
+  print("START ROTATING SENSOR IN ALL DIRECTIONS NOW...")
+
+  oled.fill(0)
+  oled.text("Calibrating...",0, 10)
+  oled.text("Rotate in",0, 30)
+  oled.text("all directions",0, 39)
+
+  oled.show()
+  
+  time.sleep(2)
+  
+  for _ in range(300):
+      # 1. Grab whatever data packet the library spits out
+      data_packet = mag.read_raw()
+      
+      # 2. Check length and dynamically extract X, Y, and Z
+      if len(data_packet) == 4:
+          x, y, z, t = data_packet # Handles standard (x, y, z, t) tuple
+      elif len(data_packet) == 3:
+          x, y, z = data_packet    # Gracefully catches (x, y, z) base fallback
+      else:
+          continue                 # Skip loop if it returns a corrupted packet
+      
+      # 3. Process calibration track points normally
+      x_min, x_max = min(x_min, x), max(x_max, x)
+      y_min, y_max = min(y_min, y), max(y_max, y)
+      z_min, z_max = min(z_min, z), max(z_max, z)
+      
+      time.sleep(0.03)
+  
+  # Calculate Offsets (Hard Iron)
+  xOff = (x_max + x_min) / 2
+  yOff = (y_max + y_min) / 2
+  zOff = (z_max + z_min) / 2
+  
+  # Calculate Scales (Soft Iron)
+  avg_delta = ((x_max - x_min) + (y_max - y_min) + (z_max - z_min)) / 3
+  xScl = avg_delta / (x_max - x_min)
+  yScl = avg_delta / (y_max - y_min)
+  zScl = avg_delta / (z_max - z_min)
+  
+  roundPos = 2
+  while True:
+    # time.sleep(0.2)
+
+    print(gyroaccl.get_readings())
+    
+    oled.fill(0)
+    x, y, z, t = mag.read_scaled()
+    x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
+  
+    #raw collection
+    data_packet = mag.read_raw()
+  
+    if len(data_packet) == 4:
+        rx, ry, rz, rt = data_packet # Handles standard (x, y, z, t) tuple
+    elif len(data_packet) == 3:
+        rx, ry, rz = data_packet    # Gracefully catches (x, y, z) base fallback
+    else:
+        continue                 # Skip loop if it returns a corrupted packet
+  
+    #Applying calibration
+    cx = (rx-xOff)*xScl
+    cy = (ry-yOff)*yScl
+  
+    
+    #Bearing
+    bearing = round(((m.atan2((cy*-1),cx))*(180/(m.pi))),0)
+    if bearing < 0:
+      bearing += 360
+
+    #Display
+    # oled.text("X "+str(x),0,0)
+    # oled.text("Y "+str(y),0,10)
+    # oled.text("Z "+str(z),0,20)
+    oled.text(str(bearing)+" deg",0,30)
+    oled.show()
+    # print("x: {0} | y: {1} | z: {2} | temp: {3}".format(x, y, z, t))
+    print("x: ",x)
+    print("y: ",y)
+    print("z: ",z)
+    print(str(bearing)+"°")
