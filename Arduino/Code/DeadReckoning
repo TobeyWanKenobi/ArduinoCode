@@ -37,15 +37,14 @@ gyroaccl = LSM6DS3(i2c, address=106, mode=NORMAL_MODE_104HZ)
 width = 128
 height = 64
 
-oled = dis.SH1106_I2C(width,height,i2c,rotate=90)
+oled = dis.SH1106_I2C(width,height,i2c,rotate=0)
 oled.init_display()
 
 
 
 #clearing
 oled.fill(0)
-oled.text("Screen", int(0), int((width/2))-5)
-oled.text("Test", int(0), int((width/2))+4)
+oled.text("Screen Test", int(0), int((height/2)))
 oled.show()
 
 
@@ -53,10 +52,9 @@ def getGyroacclReading():
   ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
   return ax, ay, az, gx, gy, gz
 
-
 def gyroCali():
-  settlingTime = 2
-  calibrationTime = 10
+  settlingTime = 1
+  calibrationTime = 5
   offset = [0,0,0]
   numPoints = 0
   
@@ -72,38 +70,67 @@ def gyroCali():
     offset[0] += gx
     offset[1] += gy
     offset[2] += gz
-  
+    
+    oled.fill(0)
     # For every multiple of 100 of points done it displays progress.
     if numPoints % 100 == 0:
       print("Calibrating | {0} points done".format(numPoints))
+
+      
+      oled.text("Gyro Calibrating".format(numPoints),0,int(height/2)-4)
+      oled.text("{0} points done".format(numPoints),0,int(height/2)+5)
+      oled.show()
+      oled.fill(0)
   
   print("Calibration complete. {0} Points".format(numPoints))
+  oled.fill(0)
+  oled.text("Gyro Calibrated. {0} Points".format(numPoints),0,int(height/2))
+  oled.show()
+  time.sleep(0.1)
 
   # Averages each offset using num of points done.
   offset = [i/numPoints for i in offset]
   # print("OFFSET: {0}".format(offset))
   return offset
 
-def gyroacclDis(offset):
-  while True:
-    ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
-    gyro = [gx,gy,gz]
-    accl = [ax,ay,az]
+def gyroAcclCalc(offset,initTime):
+  
+  # GyroAccl readings
+  ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
+  gyro = [gx,gy,gz]
+  accl = [ax,ay,az]
+  pr = [0.0,0.0]
 
-    # Adds or subtracts offset according to num sign (+ or -)
-    for x in range(len(gyro)):  
-      gyro[x] = gyro[x]-offset[x] 
-        
+  # Adds or subtracts offset according to num sign (+ or -)
+  for x in range(len(gyro)):  
+    gyro[x] = round((gyro[x]-offset[x]),2)
+  
+  nowTime = time.ticks_us()
+  deltaTime = time.ticks_diff(nowTime, initTime) / 1000000.0
+  initTime = nowTime
+
+  if deltaTime <= 0:
+    return None
+
+  acclRoll = m.degrees(m.atan2(ay, az))
+  acclPitch = m.degrees(m.atan2(-ax, m.sqrt(ay*ay + az*az)))
+
+  pr[0] = 0.995*(pr[0]+gyro[0]*deltaTime)+0.005*acclPitch # Pitch
+  pr[1] = 0.995*(pr[1]+gyro[1]*deltaTime)+0.005*acclRoll # Roll
+  
+  
+
+     
+    
+  return gyro,pr
+
+
+def gyroAccl():
+  offset = gyroCali()
+  compass(offset)
     
 
-    print("Accelerometer\nX:{}, Y:{}, Z:{}\nGyro\nX:{}, Y:{}, Z{}\n\n ".format(ax, ay, az, gyro[0], gyro[1], gyro[2]))
-    time.sleep(0.2)
-
-offset = gyroCali()
-gyroacclDis(offset)
-    
-
-def compass():
+def compass(offset):
   #clearing
   oled.fill(0)
   
@@ -139,9 +166,10 @@ def compass():
 
   oled.show()
   
-  time.sleep(2)
-  
-  for _ in range(300):
+  time.sleep(1)
+
+  compassCaliCycles = 10 #usually 300
+  for _ in range(compassCaliCycles):
       # 1. Grab whatever data packet the library spits out
       data_packet = mag.read_raw()
       
@@ -172,15 +200,49 @@ def compass():
   zScl = avg_delta / (z_max - z_min)
   
   roundPos = 2
-  while True:
-    # time.sleep(0.2)
 
-    print(gyroaccl.get_readings())
+  #------------------------#
+  initTime = time.ticks_us()
+  gyro = [0.0,0.0,0.0]
+  
+  # The damping factor (0.0 to 1.0)
+  ALPHA = 0.15 # Lower values = smoother/slower data. Higher values = faster/twitchier data. 0-1
+  while True:
     
+
+    # GyroAccl readings
+    ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
+    rawGyro = [gx,gy,gz]
+    accl = [ax,ay,az]
+    pr = [0.0,0.0]
+  
+    # Adds or subtracts offset according to num sign (+ or -)
+    for x in range(len(gyro)):  
+      rawGyro[x] = round((rawGyro[x]-offset[x]),2)
+      gyro[x] = (ALPHA * rawGyro[x]) + ((1.0 - ALPHA) * gyro[x])
+    
+    nowTime = time.ticks_us()
+    deltaTime = time.ticks_diff(nowTime, initTime) / 1000000.0
+    initTime = nowTime
+  
+    if deltaTime <= 0:
+      continue
+  
+    acclRoll = m.degrees(m.atan2(ay, az))
+    acclPitch = m.degrees(m.atan2(-ax, m.sqrt(ay*ay + az*az)))
+  
+    pr[0] = 0.995*(pr[0]+gyro[0]*deltaTime)+0.005*acclPitch # Pitch
+    pr[1] = 0.995*(pr[1]+gyro[1]*deltaTime)+0.005*acclRoll # Roll
+      
+
+    #------------------------#
+
+    
+    # Clear screen for degrees display
     oled.fill(0)
     x, y, z, t = mag.read_scaled()
     x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
-  
+
     #raw collection
     data_packet = mag.read_raw()
   
@@ -194,7 +256,6 @@ def compass():
     #Applying calibration
     cx = (rx-xOff)*xScl
     cy = (ry-yOff)*yScl
-  
     
     #Bearing
     bearing = round(((m.atan2((cy*-1),cx))*(180/(m.pi))),0)
@@ -202,13 +263,31 @@ def compass():
       bearing += 360
 
     #Display
-    # oled.text("X "+str(x),0,0)
-    # oled.text("Y "+str(y),0,10)
-    # oled.text("Z "+str(z),0,20)
     oled.text(str(bearing)+" deg",0,30)
     oled.show()
-    # print("x: {0} | y: {1} | z: {2} | temp: {3}".format(x, y, z, t))
-    print("x: ",x)
-    print("y: ",y)
-    print("z: ",z)
+    print("Compass\nx: {0}\ny: {1}\nz: {2} ".format(x, y, z))
     print(str(bearing)+"°")
+    
+    print("Gyro °/s\nX: {0}\nY:{1}\nZ:{2}".format(gyro[0],gyro[1],gyro[2]))
+    print("PRY °\nP: {0}\nR:{1}".format(pr[0],pr[1]))
+
+#Start button
+gyroAccl()
+
+
+
+
+
+#v BIN but might use later v
+# def gyroacclDis(offset):
+#   while True:
+#     ax, ay, az, gx, gy, gz = gyroaccl.get_readings()
+#     gyro = [gx,gy,gz]
+#     accl = [ax,ay,az]
+
+#     # Adds or subtracts offset according to num sign (+ or -)
+#     for x in range(len(gyro)):  
+#       gyro[x] = gyro[x]-offset[x] 
+
+#     print("Accelerometer\nX:{}, Y:{}, Z:{}\nGyro\nX:{}, Y:{}, Z{}\n\n ".format(ax, ay, az, gyro[0], gyro[1], gyro[2]))
+#     time.sleep(0.2)
