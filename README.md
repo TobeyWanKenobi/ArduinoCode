@@ -5,4 +5,5 @@ Contains all Arduino projects and their relevant code.
 Main Projects and their files:
 - Code
   - Mag = Triple Axis Magnetometer Compass
-  - Dead-Reckoning = Dead Reckoning project using Triple Axis Magnetometer & 6-DoF Accelerometer + Gyroscope Inertial Measurement Unit 
+  - Dead-Reckoning = Dead Reckoning project using Triple Axis Magnetometer & 6-DoF Accelerometer + Gyroscope Inertial Measurement Unit
+  - Packet Sniffer = 2.4GHz RF Signal Sniffer using ESP32 built in radio to monitor to collect & sort detected packets from a range of channels. 
