@@ -1,0 +1,17 @@
+# Button input into D12
+# LED Output D10
+
+from machine import Pin 
+import time
+
+but = Pin("D12",Pin.IN)
+led = Pin("D10",Pin.OUT)
+
+print("Button Running")
+led.value(1)
+press = 0
+while True:
+  if but.value() == 1:
+    press = press+1
+    print("Button Pressed {0} times!").format(press)
+    
