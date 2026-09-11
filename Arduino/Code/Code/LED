@@ -1,5 +1,0 @@
-from machine import Pin, SoftI2C
-import time
-
-led = Pin("D2", Pin.OUT)
-led.value(1)
