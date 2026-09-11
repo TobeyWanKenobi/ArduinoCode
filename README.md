@@ -6,4 +6,5 @@ Main Projects and their files:
 - Code
   - Mag = Triple Axis Magnetometer Compass
   - Dead-Reckoning = Dead Reckoning project using Triple Axis Magnetometer & 6-DoF Accelerometer + Gyroscope Inertial Measurement Unit
+    - GyroCali = Gyroscope calibration file, used to test gyroscope calibration and then implemented into Dead-Reckoning file.   
   - Packet Sniffer = 2.4GHz RF Signal Sniffer using ESP32 built in radio to monitor to collect & sort detected packets from a range of channels. 
