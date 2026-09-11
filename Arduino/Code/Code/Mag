@@ -1,0 +1,122 @@
+# This program was created in Arduino Lab for MicroPython
+from machine import Pin, SoftI2C
+import time
+import sh1106 as dis
+import qmc5883p
+import math as m
+
+
+# SCL A7, SDA A6, Freq 400kHz
+i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+
+print("Scanning for I2C devices")
+devices = i2c.scan()
+
+print()
+print("List Of Devices:")
+print(devices)
+
+width = 128
+height = 64
+
+oled = dis.SH1106_I2C(width,height,i2c,rotate=180)
+
+#Compuss stuff
+# https://github.com/robert-hh/QMC5883
+mag = qmc5883p.QMC5883P(i2c)
+
+oversampling = 0
+sampleRate = 3
+range = 0
+
+mag.set_oversampling(oversampling)
+mag.set_samplingrate(sampleRate)
+mag.set_range(range)
+
+# Black for GND
+# Red for V+
+# Blue for SDA
+# Yellow for SCL
+
+
+
+
+#CALIBRATION
+x_min = y_min = z_min = 32767
+x_max = y_max = z_max = -32768
+
+print("START ROTATING SENSOR IN ALL DIRECTIONS NOW...")
+time.sleep(2)
+
+for _ in range(300):
+    # 1. Grab whatever data packet the library spits out
+    data_packet = mag.read_raw()
+    
+    # 2. Check length and dynamically extract X, Y, and Z
+    if len(data_packet) == 4:
+        x, y, z, t = data_packet # Handles standard (x, y, z, t) tuple
+    elif len(data_packet) == 3:
+        x, y, z = data_packet    # Gracefully catches (x, y, z) base fallback
+    else:
+        continue                 # Skip loop if it returns a corrupted packet
+    
+    # 3. Process calibration track points normally
+    x_min, x_max = min(x_min, x), max(x_max, x)
+    y_min, y_max = min(y_min, y), max(y_max, y)
+    z_min, z_max = min(z_min, z), max(z_max, z)
+    
+    time.sleep(0.1)
+
+# Calculate Offsets (Hard Iron)
+xOff = (x_max + x_min) / 2
+yOff = (y_max + y_min) / 2
+zOff = (z_max + z_min) / 2
+
+# Calculate Scales (Soft Iron)
+avg_delta = ((x_max - x_min) + (y_max - y_min) + (z_max - z_min)) / 3
+xScl = avg_delta / (x_max - x_min)
+yScl = avg_delta / (y_max - y_min)
+zScl = avg_delta / (z_max - z_min)
+
+roundPos = 2
+while True:
+  # time.sleep(0.2)
+  oled.fill(0)
+  x, y, z, t = mag.read_scaled()
+  x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
+
+  #raw collection
+  data_packet = mag.read_raw()
+
+  if len(data_packet) == 4:
+      rx, ry, rz, rt = data_packet # Handles standard (x, y, z, t) tuple
+  elif len(data_packet) == 3:
+      rx, ry, rz = data_packet    # Gracefully catches (x, y, z) base fallback
+  else:
+      continue                 # Skip loop if it returns a corrupted packet
+
+  #Applying calibration
+  cx = (rx-xOff)*xScl
+  cy = (ry-yOff)*yScl
+
+  
+  #Bearing
+  bearing = round(((m.atan2(cx,cy))*(180/(m.pi))),2)
+  if bearing < 0:
+    bearing += 360
+
+  #Display
+  # oled.text("X "+str(x),0,0)
+  # oled.text("Y "+str(y),0,10)
+  # oled.text("Z "+str(z),0,20)
+  oled.text(str(bearing)+" deg",0,30)
+  oled.show()
+  # print("x: {0} | y: {1} | z: {2} | temp: {3}".format(x, y, z, t))
+  print("x: ",x)
+  print("y: ",y)
+  print("z: ",z)
+  print(str(bearing)+"°")
+  
+
+
+

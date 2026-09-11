@@ -1,0 +1,20 @@
+from machine import Pin, SoftI2C,ADC
+import time
+import sh1106 as dis
+import qmc5883p
+import math as m
+
+# Screen stuff
+# SCL A7, SDA A6, Freq 400kHz
+i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+print("Scanning for I2C devices")
+devices = i2c.scan()
+
+print()
+print("List Of Devices:")
+print(devices)
+
+width = 128
+height = 64
+
+oled = dis.SH1106_I2C(width,height,i2c,rotate=180)

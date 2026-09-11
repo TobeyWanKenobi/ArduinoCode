@@ -1,0 +1,408 @@
+#Arduino Placement: Charging port R = C30
+#Screen Placement: GND port = J4
+
+
+from machine import Pin, SoftI2C
+import time
+import sh1106 as dis
+import qmc5883p
+import math as m
+
+# D3 Yellow
+# D2 Red
+# D4 Green
+
+ledYel = Pin("D3",Pin.OUT)
+ledRed = Pin("D2",Pin.OUT)
+ledGreen = Pin("D4",Pin.OUT)
+
+ledArray = [ledYel,ledRed,ledGreen]
+ledYel.value(0)
+ledRed.value(0)
+ledGreen.value(0)
+
+
+# Uses https://github.com/robert-hh/SH1106/tree/master
+  
+# Screen stuff
+# SCL A7, SDA A6, Freq 400kHz
+i2c = SoftI2C(scl = Pin("A7"), sda = Pin("A6"))
+print("Scanning for I2C devices")
+devices = i2c.scan()
+
+print()
+print("List Of Devices:")
+print(devices)
+
+width = 128
+height = 64
+
+oled = dis.SH1106_I2C(width,height,i2c,rotate=180)
+
+
+#Compuss stuff
+mag = qmc5883p.QMC5883P(i2c)
+
+# Black for GND
+# Red for V+
+# Blue for SDA
+# Yellow for SCL
+
+  # N = D5
+  # NE = D6
+  # E = D7
+  # SE = D8
+  # S = D9
+  # SW = D10
+  # W = D11
+  # NW = D12
+
+
+
+ledN = Pin("D5",Pin.OUT)
+ledNE = Pin("D6",Pin.OUT)
+ledE = Pin("D7",Pin.OUT)
+ledSE = Pin("D8",Pin.OUT)
+ledS = Pin("D9",Pin.OUT)
+ledSW = Pin("D10",Pin.OUT)
+ledW = Pin("D11",Pin.OUT)
+ledNW = Pin("D12",Pin.OUT)
+
+compassLedArray = [ledN,ledNE,ledE,ledSE,ledS,ledSW,ledW,ledNW]
+
+def ledMenu():
+  for x in range(len(ledArray)):
+    ledArray[x].value(0)
+  ledYel.value(1)
+
+def ledFunc():
+  for x in range(len(ledArray)):
+    ledArray[x].value(0)
+  ledGreen.value(1)
+
+def menu():
+  active = False
+  ledMenu()
+  #clearing
+  oled.fill(0)
+  textHeightOffset = 8
+  oled.text("Central Function Menu (CFM)", int(0), int((height/3)-textHeightOffset))
+  oled.text("Menu (CFM)", int(0), int((height/3)+9-textHeightOffset))
+  oled.text("By Tobey Wong", int(0), int((height-10)-textHeightOffset))
+  oled.show()
+  
+  print()
+  print("-----------")
+  print("Menu")
+  print("-----------")
+  print("1 | LightControl")
+  print("2 | Screen")
+  print("3 | Compass")
+  select = int(input())
+
+  if select == 1:
+    light()
+  elif select == 2:
+    screen()
+  elif select == 3:
+    compass()
+  else:
+    print("Invalid Input")
+    menu()
+    
+
+def light():
+  #clearing
+  oled.fill(0)
+  ledFunc()
+  def lightMenu():
+    print()
+    print("-----------")
+    print("Menu")
+    print("-----------")
+    print("1 | All on")
+    print("2 | All off")
+    print("3 | ")
+    print("0 | Exit")
+    print("1738 | Clear Screen")
+    select = int(input())
+  
+    if select == 1:
+      allOn(ledArray)
+    elif select == 2:
+      allOff(ledArray)
+    # elif select == 3:
+    #   timer()
+    elif select == 0:
+      menu()
+
+  def allOff(ledArray):
+    for x in range(len(ledArray)):
+      ledArray[x].value(0)
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(0)
+    lightMenu()
+  
+  def allOn(ledArray):
+    for x in range(len(ledArray)):
+      ledArray[x].value(1)
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(1)
+    lightMenu()
+
+  # Main Menu Display for module  
+  lightMenu()
+
+
+
+
+def screen():
+  #clearing
+  oled.fill(0)
+  ledFunc()
+  
+  def disMenu():
+    print()
+    print("-----------")
+    print("Menu")
+    print("-----------")
+    print("1 | HText")
+    print("2 | textDisplay")
+    print("3 | Timer")
+    print("0 | Exit")
+    print("1738 | Clear Screen")
+    select = int(input())
+  
+    if select == 1:
+      Htext()
+    elif select == 2:
+      textDisplay()
+    elif select == 3:
+      timer()
+    elif select == 0:
+      menu()
+    elif select == 1738:
+      oled.fill(0)
+      oled.show()
+      print("Display Cleared!")
+      disMenu()
+      
+  def Htext():
+    #clearing
+    oled.fill(0)
+    
+    oled.text("I", 0, 0)
+    oled.text("Love", 0, 20)
+    oled.text("You <3", 0, 40)
+    oled.show()
+    disMenu()
+
+  def textDisplay():
+    #clearing
+    oled.fill(0)
+    
+    print("Input how many lines you want:")
+    lines = int(input())
+    lineHeight = height/lines
+    textArray = [""]*lines
+
+    for x in range(lines):
+      print("Input what you want to display on line",str((x+1)))
+      textArray[x] = input()
+      print(textArray)
+
+    print("Collection done!")
+    time.sleep(0.5)
+    print("Displaying!")
+
+    heightCount = 0
+    for x in range(len(textArray)):
+      oled.text(textArray[x],0,int(heightCount))
+      heightCount = int(heightCount+lineHeight)
+      oled.show()
+    
+    print("Displaying Finished!")
+    disMenu() 
+
+  def timer():
+    #clearing
+    oled.fill(0)
+    ledFunc()
+    
+    print("----TIMER----")
+    print("Set timer duration:")
+    dur = float(input())
+    currentDur = 0
+    while currentDur < dur:
+      oled.fill(0)
+      oled.show()
+      currentDur = round((currentDur + 0.1),2)
+      oled.text((str(currentDur)+" of "+str(dur)),0,0)
+      oled.show()
+      time.sleep(0.1)
+    
+    print("Timer Finished!")
+    oled.text("Time Reached!",0,20)
+    oled.show()
+    time.sleep(0.5)
+    
+      
+    disMenu()
+    
+    
+  #Main Menu Display for module  
+  disMenu()
+
+def compass():
+  #clearing
+  oled.fill(0)
+  ledFunc()
+  
+  oversampling = 0
+  sampleRate = 3
+  range = 0
+  
+  mag.set_oversampling(oversampling)
+  mag.set_samplingrate(sampleRate)
+  mag.set_range(range)
+  
+  # Black for GND
+  # Red for V+
+  # Blue for SDA
+  # Yellow for SCL
+  
+  # N = D5
+  # NE = D6
+  # E = D7
+  # SE = D8
+  # S = D9
+  # SW = D10
+  # W = D11
+  # NW = D12
+  
+  
+  #CALIBRATION
+  x_min = y_min = z_min = 32767
+  x_max = y_max = z_max = -32768
+  
+  print("START ROTATING SENSOR IN ALL DIRECTIONS NOW...")
+
+  oled.fill(0)
+  oled.text("Calibrating...",0, 10)
+  oled.text("Rotate in",0, 30)
+  oled.text("all directions",0, 39)
+
+  oled.show()
+  
+  time.sleep(2)
+  
+  for _ in range(300):
+      # 1. Grab whatever data packet the library spits out
+      data_packet = mag.read_raw()
+      
+      # 2. Check length and dynamically extract X, Y, and Z
+      if len(data_packet) == 4:
+          x, y, z, t = data_packet # Handles standard (x, y, z, t) tuple
+      elif len(data_packet) == 3:
+          x, y, z = data_packet    # Gracefully catches (x, y, z) base fallback
+      else:
+          continue                 # Skip loop if it returns a corrupted packet
+      
+      # 3. Process calibration track points normally
+      x_min, x_max = min(x_min, x), max(x_max, x)
+      y_min, y_max = min(y_min, y), max(y_max, y)
+      z_min, z_max = min(z_min, z), max(z_max, z)
+      
+      time.sleep(0.03)
+  
+  # Calculate Offsets (Hard Iron)
+  xOff = (x_max + x_min) / 2
+  yOff = (y_max + y_min) / 2
+  zOff = (z_max + z_min) / 2
+  
+  # Calculate Scales (Soft Iron)
+  avg_delta = ((x_max - x_min) + (y_max - y_min) + (z_max - z_min)) / 3
+  xScl = avg_delta / (x_max - x_min)
+  yScl = avg_delta / (y_max - y_min)
+  zScl = avg_delta / (z_max - z_min)
+  
+  roundPos = 2
+  while True:
+    # time.sleep(0.2)
+    
+    # Clear all lights
+    for x in range(len(compassLedArray)):
+      compassLedArray[x].value(0)
+    
+    oled.fill(0)
+    x, y, z, t = mag.read_scaled()
+    x, y, z, t = round(x, 2), round(y, 2), round(z, 2), round(t, 2)
+  
+    #raw collection
+    data_packet = mag.read_raw()
+  
+    if len(data_packet) == 4:
+        rx, ry, rz, rt = data_packet # Handles standard (x, y, z, t) tuple
+    elif len(data_packet) == 3:
+        rx, ry, rz = data_packet    # Gracefully catches (x, y, z) base fallback
+    else:
+        continue                 # Skip loop if it returns a corrupted packet
+  
+    #Applying calibration
+    cx = (rx-xOff)*xScl
+    cy = (ry-yOff)*yScl
+  
+    
+    #Bearing
+    bearing = round(((m.atan2((cy*-1),cx))*(180/(m.pi))),0)
+    if bearing < 0:
+      bearing += 360
+
+    #Lights
+    # N = D5
+    # NE = D6
+    # E = D7
+    # SE = D8
+    # S = D9
+    # SW = D10
+    # W = D11
+    # NW = D12
+
+    if 330 <= bearing <= 360 or 000 <= bearing <= 30:
+      ledN.value(1)
+    elif 15 <= bearing <= 75:
+      ledNE.value(1)
+    elif 60 <= bearing <= 120:
+      ledE.value(1)
+    elif 105 <= bearing <= 165:
+      ledSE.value(1)
+    elif 150 <= bearing <= 210:
+      ledS.value(1)
+    elif 195 <= bearing <= 255:
+      ledSW.value(1)
+    elif 240 <= bearing <= 300:
+      ledW.value(1)
+    elif 285 <= bearing <= 345:
+      ledNW.value(1)
+    else:
+      for x in range(len(compassLedArray)):
+        compassLedArray[x].value(0)
+    
+    
+    #Display
+    # oled.text("X "+str(x),0,0)
+    # oled.text("Y "+str(y),0,10)
+    # oled.text("Z "+str(z),0,20)
+    oled.text(str(bearing)+" deg",0,30)
+    oled.show()
+    # print("x: {0} | y: {1} | z: {2} | temp: {3}".format(x, y, z, t))
+    print("x: ",x)
+    print("y: ",y)
+    print("z: ",z)
+    print(str(bearing)+"°")
+
+ledRed.value(1)
+#MAIN whole program menu display
+menu()
+# compass()
+    
