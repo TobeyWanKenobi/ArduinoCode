@@ -7,7 +7,7 @@ import qmc5883p
 import math as m
 from lsm6ds3 import LSM6DS3, NORMAL_MODE_104HZ
 
-
+#LED D2
 
 # SCL A7, SDA A6, Freq 400kHz
 
